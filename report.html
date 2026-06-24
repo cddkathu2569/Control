@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="th" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>รายงานผู้บริหาร — ทะเบียนคุมเบิกจ่ายร้านค้า</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Prompt:wght@400;600;700&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* View-only badge */
+    .view-only-badge {
+      display:inline-flex; align-items:center; gap:6px;
+      background: var(--primary-light); color: var(--primary);
+      border:1px solid rgba(99,102,241,.25);
+      font-size: 0.72rem; font-weight: 800;
+      padding: 5px 12px; border-radius: 20px; letter-spacing:.04em;
+      text-transform: uppercase; white-space:nowrap;
+    }
+    .navbar-role.viewer { background:var(--primary-light); color:var(--primary); }
+    /* Report login */
+    .manager-login-link { margin-top:16px;text-align:center; }
+    .manager-login-link a { font-size:.82rem;color:var(--text-muted);text-decoration:none;font-weight:600; }
+    .manager-login-link a:hover { color:var(--primary); }
+    .manager-admin-link {
+      text-decoration:none;font-size:.78rem;width:auto !important;
+      padding:0 12px !important;gap:6px;border-radius:20px !important;
+      font-weight:700;
+    }
+    .type-badge-in  { background:rgba(16,185,129,.15);color:#10b981;border:1px solid rgba(16,185,129,.3); padding:3px 10px;border-radius:20px;font-size:.75rem;font-weight:700; }
+    .type-badge-out { background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.3); padding:3px 10px;border-radius:20px;font-size:.75rem;font-weight:700; }
+    .amount-in  { color:#10b981; font-weight:700; }
+    .amount-out { color:#ef4444; font-weight:700; }
+  </style>
+</head>
+<body>
+
+  <!-- LOGIN GATE -->
+  <div id="login-container" class="login-wrapper" style="display:flex;align-items:center;justify-content:center;min-height:100vh;">
+    <div class="login-card">
+      <div class="login-header">
+        <i class="fa-solid fa-file-invoice-dollar login-logo"></i>
+        <h1 style="text-align:center;">รายงานผู้บริหาร</h1>
+        <p class="text-muted" style="text-align:center;">ระบบทะเบียนคุมเบิกจ่ายร้านค้า — View Only</p>
+      </div>
+      <form id="form-login" class="login-form">
+        <div class="form-group mb-3">
+          <label for="login-email"><i class="fa-solid fa-envelope"></i> อีเมล</label>
+          <input type="email" id="login-email" placeholder="กรอกอีเมล" required autocomplete="email">
+        </div>
+        <div class="form-group mb-4">
+          <label for="login-password"><i class="fa-solid fa-lock"></i> รหัสผ่าน</label>
+          <input type="password" id="login-password" placeholder="กรอกรหัสผ่าน" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block w-100 py-3" style="font-size:1.05rem;">
+          <i class="fa-solid fa-right-to-bracket"></i> เข้าสู่ระบบ
+        </button>
+        <div id="login-error-msg" style="display:none;margin-top:12px;color:var(--danger);font-size:.88rem;text-align:center;padding:10px;background:var(--danger-light);border-radius:8px;"></div>
+      </form>
+      <div class="manager-login-link">
+        <a href="index.html">← กลับหน้า Login หลัก</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- APP WORKSPACE -->
+  <div id="app-container" class="app-container" style="display:none;">
+
+    <!-- TOP NAVBAR -->
+    <nav class="top-navbar">
+      <div class="navbar-brand">
+        <i class="fa-solid fa-file-invoice-dollar navbar-logo"></i>
+        <div class="navbar-brand-text">
+          <span class="navbar-title">ทะเบียนคุมเบิกจ่าย</span>
+          <span class="navbar-role viewer">ผู้บริหาร · View Only</span>
+        </div>
+      </div>
+      <div class="navbar-divider"></div>
+      <nav class="navbar-menu">
+        <button class="menu-item active" data-tab="dashboard">
+          <i class="fa-solid fa-chart-pie"></i><span>แผงควบคุม</span>
+        </button>
+        <button class="menu-item" data-tab="statement">
+          <i class="fa-solid fa-building-columns"></i><span>บัญชีเดินสะพัด</span>
+        </button>
+        <button class="menu-item" data-tab="shops">
+          <i class="fa-solid fa-store"></i><span>ร้านค้า</span>
+        </button>
+      </nav>
+      <div class="navbar-right">
+        <span class="navbar-date">
+          <i class="fa-regular fa-calendar-days"></i>
+          <span id="header-today-date"></span>
+        </span>
+        <div class="navbar-user">
+          <i class="fa-solid fa-circle-user"></i>
+          <span id="user-display-name">ผู้บริหาร</span>
+          <button id="btn-logout" class="btn-logout-top"><i class="fa-solid fa-right-from-bracket"></i> ออก</button>
+        </div>
+        <a href="admin.html" class="btn-theme-round manager-admin-link" title="หน้าจัดการ (เจ้าหน้าที่)">
+          <i class="fa-solid fa-screwdriver-wrench"></i>
+        </a>
+        <button id="theme-toggle" class="btn-theme-round" title="เปลี่ยนธีม">
+          <i class="fa-solid fa-moon"></i>
+        </button>
+      </div>
+    </nav>
+
+    <main class="main-content">
+      <div class="page-title-bar">
+        <div>
+          <h1 id="page-title" class="page-title-text">แผงควบคุม</h1>
+          <p id="page-subtitle" class="page-title-sub text-muted">ข้อมูล Live — อ่านอย่างเดียว</p>
+        </div>
+        <span class="view-only-badge"><i class="fa-solid fa-eye"></i> View Only</span>
+      </div>
+
+      <!-- TAB: DASHBOARD -->
+      <section id="tab-dashboard" class="tab-content active">
+        <div class="stats-grid">
+          <div class="stat-card total">
+            <div class="stat-icon"><i class="fa-solid fa-wallet"></i></div>
+            <div class="stat-info">
+              <h3>ยอดเบิกจ่ายทั้งหมด</h3>
+              <p class="stat-value" id="stat-total-disbursed">฿0.00</p>
+              <span class="stat-label">รวมทุกสถานะรายการ</span>
+            </div>
+          </div>
+          <div class="stat-card paid">
+            <div class="stat-icon"><i class="fa-solid fa-circle-check"></i></div>
+            <div class="stat-info">
+              <h3>จ่ายเงินแล้ว</h3>
+              <p class="stat-value" id="stat-total-paid">฿0.00</p>
+              <span class="stat-label" id="stat-paid-count">0 รายการ</span>
+            </div>
+          </div>
+          <div class="stat-card pending">
+            <div class="stat-icon"><i class="fa-solid fa-piggy-bank"></i></div>
+            <div class="stat-info">
+              <h3>ยอดคงเหลือรวมทุกร้าน</h3>
+              <p class="stat-value" id="stat-total-pending">฿0.00</p>
+              <span class="stat-label" id="stat-pending-count">โอนเข้า − เบิกออก</span>
+            </div>
+          </div>
+          <div class="stat-card shops">
+            <div class="stat-icon"><i class="fa-solid fa-store"></i></div>
+            <div class="stat-info">
+              <h3>ร้านค้าในระบบ</h3>
+              <p class="stat-value" id="stat-total-shops">0</p>
+              <span class="stat-label">ร้านค้าที่ขึ้นทะเบียนคุม</span>
+            </div>
+          </div>
+        </div>
+        <div class="charts-grid">
+          <div class="chart-card">
+            <div class="chart-header"><h3><i class="fa-solid fa-chart-column"></i> เงินเข้า/เงินออก แยกตามรายเดือน</h3></div>
+            <div class="chart-body"><canvas id="monthlyChart"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header"><h3><i class="fa-solid fa-chart-pie"></i> ยอดเบิกจ่ายสะสมแยกตามร้านค้า</h3></div>
+            <div class="chart-body"><canvas id="shopChart"></canvas></div>
+          </div>
+        </div>
+        <div class="table-section mt-4">
+          <div class="table-header">
+            <h3><i class="fa-solid fa-clock-rotate-left"></i> รายการล่าสุด (เงินเข้า/เงินออก)</h3>
+            <button class="btn btn-secondary btn-sm" onclick="switchTab('statement')">ดูทั้งหมด</button>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead><tr>
+                <th>วันที่</th><th>เลขที่เอกสาร</th><th>ร้านค้า</th>
+                <th>รายละเอียด</th>
+                <th class="text-right">ยอดก่อนภาษี</th>
+                <th class="text-right">VAT</th>
+                <th class="text-right">หัก ณ ที่จ่าย</th>
+                <th class="text-right">ยอดสุทธิ</th>
+                <th>ช่องทาง</th><th>สถานะ</th><th class="text-center">ประเภท</th>
+              </tr></thead>
+              <tbody id="recent-tbody"><tr><td colspan="11" class="text-center text-muted py-4">กำลังโหลด...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: STATEMENT -->
+      <section id="tab-statement" class="tab-content">
+        <div class="filter-panel card">
+          <div class="filter-grid">
+            <div class="filter-group">
+              <label for="st-shop"><i class="fa-solid fa-store"></i> ร้านค้า</label>
+              <select id="st-shop"><option value="">ทุกร้านค้า</option></select>
+            </div>
+            <div class="filter-group">
+              <label for="st-type"><i class="fa-solid fa-filter"></i> ประเภทรายการ</label>
+              <select id="st-type">
+                <option value="">ทั้งหมด</option>
+                <option value="in">เงินเข้า (โอนเข้า)</option>
+                <option value="out">เงินออก (เบิกจ่าย)</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label for="st-start"><i class="fa-solid fa-calendar"></i> เริ่มต้น</label>
+              <input type="date" id="st-start">
+            </div>
+            <div class="filter-group">
+              <label for="st-end"><i class="fa-solid fa-calendar"></i> สิ้นสุด</label>
+              <input type="date" id="st-end">
+            </div>
+          </div>
+          <div class="filter-actions mt-3">
+            <button class="btn btn-outline" id="btn-clear-st"><i class="fa-solid fa-rotate-left"></i> ล้างตัวกรอง</button>
+          </div>
+        </div>
+        <div class="table-section card mt-4">
+          <div class="table-header">
+            <div class="table-title">
+              <h3><i class="fa-solid fa-building-columns"></i> บัญชีเดินสะพัด (เงินเข้า/เงินออก)</h3>
+              <span class="badge badge-info" id="st-count">0 รายการ</span>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead><tr>
+                <th>วันที่</th><th>เลขที่เอกสาร</th><th>ร้านค้า</th>
+                <th>รายละเอียด</th>
+                <th class="text-right">ยอดก่อนภาษี</th>
+                <th class="text-right">VAT (7%)</th>
+                <th class="text-right">หัก ณ ที่จ่าย</th>
+                <th class="text-right" style="color:#10b981">เงินเข้า (+)</th>
+                <th class="text-right" style="color:#ef4444">เงินออก (−)</th>
+                <th>ช่องทาง</th><th>สถานะ</th><th class="text-center">ประเภท</th>
+              </tr></thead>
+              <tbody id="statement-tbody"><tr><td colspan="12" class="text-center text-muted py-4">กำลังโหลด...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: SHOPS -->
+      <section id="tab-shops" class="tab-content">
+        <div class="shops-grid" id="shops-list-container">
+          <div class="text-center text-muted py-4">กำลังโหลด...</div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+<script>
+// ─── Helpers ───────────────────────────────────────────────
+const fmt = n => '฿' + (parseFloat(n)||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtDate = d => { if(!d) return '-'; const p = d.split('-'); return `${p[2]}/${p[1]}/${parseInt(p[0])+543}`; };
+function calcNet(sub, vatType, whtRate) {
+  let vat=0, wht=0, net=parseFloat(sub)||0;
+  if(vatType==='exclude') vat=net*.07;
+  else if(vatType==='include') { vat=net*7/107; net=net-vat; }
+  const base = net + (vatType==='exclude'?vat:0);
+  wht = base * ((parseFloat(whtRate)||0)/100);
+  return { subtotal: net, vat: vat, wht: wht, net: net + (vatType==='exclude'?vat:0) - wht };
+}
+
+// ─── Theme ─────────────────────────────────────────────────
+const savedTheme = localStorage.getItem('sys_theme')||'light';
+document.documentElement.dataset.theme = savedTheme;
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  const t = document.documentElement.dataset.theme==='dark'?'light':'dark';
+  document.documentElement.dataset.theme = t;
+  localStorage.setItem('sys_theme', t);
+  document.querySelector('#theme-toggle i').className = t==='dark'?'fa-solid fa-sun':'fa-solid fa-moon';
+});
+
+// ─── Date ──────────────────────────────────────────────────
+function initDate() {
+  const days = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัส','ศุกร์','เสาร์'];
+  const months = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  const n = new Date();
+  document.getElementById('header-today-date').textContent = `${days[n.getDay()]}ที่ ${n.getDate()} ${months[n.getMonth()]} ${n.getFullYear()+543}`;
+}
+initDate();
+
+// ─── Firebase ──────────────────────────────────────────────
+let auth, db, allShops=[], allDisbursements=[];
+let monthlyChart=null, shopChart=null;
+try { firebase.initializeApp(firebaseConfig); } catch(e){}
+auth = firebase.auth();
+db   = firebase.firestore();
+
+// ─── Auth ──────────────────────────────────────────────────
+auth.onAuthStateChanged(async user => {
+  if(!user) { window.location.href='index.html'; return; }
+  window.location.href='admin.html';
+  return;
+  try {
+    const doc = await db.collection('users').doc(user.uid).get();
+    const role = doc.exists ? (doc.data().role||'viewer') : 'viewer';
+    if(role==='admin') { window.location.href='admin.html'; return; }
+    document.getElementById('user-display-name').textContent = doc.exists?(doc.data().displayName||user.email):user.email;
+    showApp();
+    await loadAll();
+  } catch(e) {
+    document.getElementById('user-display-name').textContent = user.email;
+    showApp();
+    await loadAll();
+  }
+});
+
+document.getElementById('form-login').addEventListener('submit', async e => {
+  e.preventDefault();
+  const errEl = document.getElementById('login-error-msg');
+  errEl.style.display='none';
+  try {
+    await auth.signInWithEmailAndPassword(
+      document.getElementById('login-email').value.trim(),
+      document.getElementById('login-password').value
+    );
+  } catch(err) {
+    const msgs = {'auth/invalid-credential':'อีเมลหรือรหัสผ่านไม่ถูกต้อง','auth/user-not-found':'ไม่พบบัญชีนี้','auth/wrong-password':'รหัสผ่านผิด','auth/too-many-requests':'ลองใหม่ภายหลัง'};
+    errEl.textContent = msgs[err.code]||err.message;
+    errEl.style.display='block';
+  }
+});
+
+document.getElementById('btn-logout').addEventListener('click', async () => {
+  await auth.signOut();
+  window.location.href='index.html';
+});
+
+function showLogin() { document.getElementById('login-container').style.display='flex'; document.getElementById('app-container').style.display='none'; }
+function showApp()   { document.getElementById('login-container').style.display='none'; document.getElementById('app-container').style.display='block'; }
+
+// ─── Tab Switching ─────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.menu-item').forEach(b=>b.classList.remove('active'));
+  const sec = document.getElementById('tab-'+tab);
+  if(sec) sec.classList.add('active');
+  const btn = document.querySelector(`[data-tab="${tab}"]`);
+  if(btn) btn.classList.add('active');
+  const titles = {dashboard:'แผงควบคุม',statement:'บัญชีเดินสะพัด',shops:'จัดการร้านค้า'};
+  document.getElementById('page-title').textContent = titles[tab]||tab;
+  if(tab==='statement') renderStatement();
+  if(tab==='shops') renderShops();
+}
+document.querySelectorAll('.menu-item[data-tab]').forEach(btn => {
+  btn.addEventListener('click', ()=>switchTab(btn.dataset.tab));
+});
+
+// ─── Load Data ─────────────────────────────────────────────
+async function loadAll() {
+  const [s, d] = await Promise.all([
+    db.collection('shops').get(),
+    db.collection('disbursements').get()
+  ]);
+  allShops = s.docs.map(d=>({id:d.id,...d.data()}));
+  allDisbursements = d.docs.map(d=>({id:d.id,...d.data()}));
+  allShops.sort((a,b)=>(a.name||'').localeCompare(b.name||'', 'th'));
+  allDisbursements.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  renderDashboard();
+  // Populate shop filters
+  ['st-shop'].forEach(id => {
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    allShops.forEach(s => { const o=document.createElement('option'); o.value=s.id; o.textContent=s.name; sel.appendChild(o); });
+  });
+  document.getElementById('btn-clear-st').addEventListener('click',()=>{ document.getElementById('st-shop').value=''; document.getElementById('st-type').value=''; document.getElementById('st-start').value=''; document.getElementById('st-end').value=''; renderStatement(); });
+  ['st-shop','st-type','st-start','st-end'].forEach(id => document.getElementById(id)?.addEventListener('change', renderStatement));
+}
+
+// ─── Dashboard ─────────────────────────────────────────────
+function renderDashboard() {
+  const getShopName = id => allShops.find(s=>s.id===id)?.name||id;
+  // Stats
+  const totalDisbursed = allDisbursements.reduce((a,d)=>a+(d.netAmount||0),0);
+  const paid = allDisbursements.filter(d=>d.status==='Paid');
+  const totalPaid = paid.reduce((a,d)=>a+(d.netAmount||0),0);
+  const totalBudget = allShops.reduce((a,s)=>a+(s.totalBudget||0),0);
+  const usedBudget = allDisbursements
+    .filter(d=>d.status!=='Cancelled')
+    .reduce((a,d)=>a+(d.netAmount||0),0);
+  const remaining = totalBudget - usedBudget;
+  document.getElementById('stat-total-disbursed').textContent = fmt(totalDisbursed);
+  document.getElementById('stat-total-paid').textContent = fmt(totalPaid);
+  document.getElementById('stat-paid-count').textContent = `${paid.length} รายการ`;
+  document.getElementById('stat-total-pending').textContent = fmt(remaining);
+  document.getElementById('stat-pending-count').textContent = `งบรวม ${fmt(totalBudget)} - ใช้ไป ${fmt(usedBudget)}`;
+  document.getElementById('stat-total-shops').textContent = allShops.length;
+  renderCharts(getShopName);
+  renderRecent(getShopName);
+}
+
+function renderCharts(getShopName) {
+  // Monthly chart (last 6 months)
+  const months = []; const now = new Date();
+  for(let i=5;i>=0;i--){ const d=new Date(now.getFullYear(),now.getMonth()-i,1); months.push(`${d.getMonth()+1}/${d.getFullYear()}`); }
+  const outData = months.map(m => allDisbursements.filter(d=>{const dd=new Date(d.date||''); return `${dd.getMonth()+1}/${dd.getFullYear()}`===m;}).reduce((a,d)=>a+(d.netAmount||0),0));
+  const mLabels = months.map(m=>{ const [mo,yr]=m.split('/'); const mNames=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']; return mNames[parseInt(mo)-1]+'/'+(parseInt(yr)+543).toString().slice(2); });
+  if(monthlyChart) monthlyChart.destroy();
+  monthlyChart = new Chart(document.getElementById('monthlyChart'), {
+    type:'bar', data:{ labels:mLabels, datasets:[
+      {label:'ยอดเบิกจ่ายสุทธิ',data:outData,backgroundColor:'rgba(99,102,241,.75)',borderRadius:5}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{beginAtZero:true,ticks:{callback:v=>'฿'+v.toLocaleString()}}}}
+  });
+  // Shop pie chart
+  const shopTotals = allShops.map(s=>({ name:s.name, val:allDisbursements.filter(d=>d.shopId===s.id).reduce((a,d)=>a+(d.netAmount||0),0) })).filter(s=>s.val>0);
+  if(shopChart) shopChart.destroy();
+  shopChart = new Chart(document.getElementById('shopChart'), {
+    type:'doughnut', data:{ labels:shopTotals.map(s=>s.name), datasets:[{data:shopTotals.map(s=>s.val),backgroundColor:['#6366f1','#10b981','#f59e0b','#ef4444','#3b82f6','#8b5cf6','#14b8a6','#f97316'],hoverOffset:8}] },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:11}}}}}
+  });
+}
+
+function buildStatementRow(item, type, getShopName) {
+  const c = calcNet(item.subtotal||item.amount||0, item.vatType||'none', item.whtRate||0);
+  const shopName = getShopName(item.shopId);
+  const statusMap = {'Paid':'จ่ายแล้ว','Received':'รับแล้ว','Pending':'รอดำเนินการ','Cancelled':'ยกเลิก'};
+  const statusColor = {'Paid':'var(--success)','Received':'var(--success)','Pending':'var(--warning)','Cancelled':'var(--danger)'};
+  const st = item.status||'Pending';
+  if(type==='in') {
+    return `<tr>
+      <td>${fmtDate(item.date)}</td><td><strong>${item.ref||'-'}</strong></td><td>${shopName}</td>
+      <td>${item.details||'-'}</td>
+      <td class="text-right">${fmt(c.subtotal)}</td>
+      <td class="text-right">${fmt(c.vat)}</td>
+      <td class="text-right">${fmt(c.wht)}</td>
+      <td class="text-right amount-in">${fmt(c.net)}</td>
+      <td class="text-right">—</td>
+      <td>${item.paymentMethod||'-'}</td>
+      <td><span style="color:${statusColor[st]};font-weight:700;">${statusMap[st]||st}</span></td>
+      <td class="text-center"><span class="type-badge-in">▲ เงินเข้า</span></td>
+    </tr>`;
+  } else {
+    return `<tr>
+      <td>${fmtDate(item.date)}</td><td><strong>${item.ref||'-'}</strong></td><td>${shopName}</td>
+      <td>${item.details||'-'}</td>
+      <td class="text-right">${fmt(c.subtotal)}</td>
+      <td class="text-right">${fmt(c.vat)}</td>
+      <td class="text-right">${fmt(c.wht)}</td>
+      <td class="text-right">—</td>
+      <td class="text-right amount-out">${fmt(c.net)}</td>
+      <td>${item.paymentMethod||'-'}</td>
+      <td><span style="color:${statusColor[st]};font-weight:700;">${statusMap[st]||st}</span></td>
+      <td class="text-center"><span class="type-badge-out">▼ เบิกออก</span></td>
+    </tr>`;
+  }
+}
+
+function renderRecent(getShopName) {
+  const all = allDisbursements
+    .map(d=>({...d,_type:'out'}))
+    .sort((a,b)=>(b.date||'').localeCompare(a.date||''))
+    .slice(0,8);
+  const tbody = document.getElementById('recent-tbody');
+  tbody.innerHTML = all.length ? all.map(i=>buildStatementRow(i,i._type,getShopName)).join('') : '<tr><td colspan="11" class="text-center text-muted py-4">ไม่มีข้อมูล</td></tr>';
+}
+
+function renderStatement() {
+  const shopF = document.getElementById('st-shop').value;
+  const typeF = document.getElementById('st-type').value;
+  const startF = document.getElementById('st-start').value;
+  const endF   = document.getElementById('st-end').value;
+  const getShopName = id => allShops.find(s=>s.id===id)?.name||id;
+  let all = allDisbursements.map(d=>({...d,_type:'out'}));
+  if(shopF) all = all.filter(i=>i.shopId===shopF);
+  if(typeF) all = all.filter(i=>i._type===typeF);
+  if(startF) all = all.filter(i=>(i.date||'')>=startF);
+  if(endF)   all = all.filter(i=>(i.date||'')<=endF);
+  all.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  document.getElementById('st-count').textContent = `${all.length} รายการ`;
+  const tbody = document.getElementById('statement-tbody');
+  tbody.innerHTML = all.length ? all.map(i=>buildStatementRow(i,i._type,getShopName)).join('') : '<tr><td colspan="12" class="text-center text-muted py-4">ไม่มีข้อมูล</td></tr>';
+}
+
+function renderShops() {
+  const getShopName = id => allShops.find(s=>s.id===id)?.name||id;
+  const container = document.getElementById('shops-list-container');
+  if(!allShops.length){ container.innerHTML='<div class="text-center text-muted py-4">ไม่มีร้านค้า</div>'; return; }
+  container.innerHTML = allShops.map(shop => {
+    const shopDisbursed = allDisbursements
+      .filter(d=>d.shopId===shop.id && d.status!=='Cancelled')
+      .reduce((a,d)=>a+(d.netAmount||0),0);
+    const budget = shop.totalBudget||0;
+    const remaining = budget - shopDisbursed;
+    const pct = budget > 0 ? Math.min((shopDisbursed/budget)*100,100) : 0;
+    const color = pct>=90?'danger':pct>=70?'warning':'safe';
+    return `<div class="shop-card">
+      <div class="shop-card-header">
+        <div class="shop-card-icon"><i class="fa-solid fa-store"></i></div>
+        <div class="shop-card-info">
+          <h3>${shop.name}</h3>
+          <span class="text-muted" style="font-size:.8rem;">${shop.taxId?'เลขภาษี: '+shop.taxId:shop.phone||''}</span>
+        </div>
+      </div>
+      <div class="shop-stats" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0;">
+        <div style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:10px;padding:10px;text-align:center;">
+          <div style="font-size:.7rem;font-weight:700;color:#10b981;text-transform:uppercase;letter-spacing:.05em;">งบประมาณ</div>
+          <div style="font-size:1rem;font-weight:800;color:#10b981;">${fmt(budget)}</div>
+        </div>
+        <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:10px;padding:10px;text-align:center;">
+          <div style="font-size:.7rem;font-weight:700;color:#ef4444;text-transform:uppercase;letter-spacing:.05em;">เบิกออกสะสม</div>
+          <div style="font-size:1rem;font-weight:800;color:#ef4444;">${fmt(shopDisbursed)}</div>
+        </div>
+      </div>
+      <div style="background:var(--bg-app);border-radius:10px;padding:12px;text-align:center;border:1px solid var(--border-color);">
+        <div style="font-size:.7rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">ยอดคงเหลือ</div>
+        <div style="font-size:1.4rem;font-weight:800;color:${remaining>=0?'#10b981':'#ef4444'};">${fmt(remaining)}</div>
+      </div>
+      <div class="store-budget-progress-container">
+        <div class="store-budget-label-row"><span>เบิกใช้แล้ว</span><span>${pct.toFixed(1)}%</span></div>
+        <div class="store-progress-bg"><div class="store-progress-fill ${color}" style="width:${pct}%"></div></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
