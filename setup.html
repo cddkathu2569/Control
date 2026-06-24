@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🔥 Firebase Setup — ระบบทะเบียนคุมเบิกจ่าย</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary:   #6366F1;
+      --success:   #10B981;
+      --warning:   #F59E0B;
+      --danger:    #EF4444;
+      --bg:        #0F172A;
+      --bg-card:   #1E293B;
+      --bg-input:  #0F172A;
+      --border:    #334155;
+      --text:      #F1F5F9;
+      --text-muted:#94A3B8;
+      --radius:    12px;
+    }
+
+    body {
+      font-family: 'Sarabun', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 32px 16px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 680px;
+    }
+
+    /* Header */
+    .setup-header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .setup-header .fire-icon {
+      font-size: 3rem;
+      background: linear-gradient(135deg, #FF6B35, #F59E0B);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: block;
+      margin-bottom: 12px;
+    }
+    .setup-header h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #818CF8, #6366F1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .setup-header p {
+      color: var(--text-muted);
+      margin-top: 6px;
+      font-size: 0.95rem;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 18px;
+      color: var(--text);
+    }
+    .step-badge {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: #fff;
+      font-size: 0.8rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .step-badge.done { background: var(--success); }
+
+    /* Form elements */
+    .form-group { margin-bottom: 14px; }
+    label {
+      display: block;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 10px 14px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'Sarabun', monospace;
+      font-size: 0.9rem;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    input:focus, textarea:focus { border-color: var(--primary); }
+    textarea { resize: vertical; min-height: 130px; font-size: 0.8rem; font-family: monospace; }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-family: 'Sarabun', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #6366F1, #4F46E5);
+      color: #fff;
+      width: 100%;
+      justify-content: center;
+      padding: 14px;
+      font-size: 1rem;
+    }
+    .btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(99,102,241,0.4); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      padding: 8px 16px;
+    }
+    .btn-outline:hover { border-color: var(--primary); color: var(--text); }
+
+    /* Alert / status boxes */
+    .alert {
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      line-height: 1.5;
+    }
+    .alert i { flex-shrink: 0; margin-top: 2px; }
+    .alert-info    { background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.4); color: #A5B4FC; }
+    .alert-success { background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); color: #6EE7B7; }
+    .alert-warning { background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.4); color: #FCD34D; }
+    .alert-danger  { background: rgba(239,68,68,0.15);  border: 1px solid rgba(239,68,68,0.4);  color: #FCA5A5; }
+
+    /* Log output */
+    .log-box {
+      background: #000;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.82rem;
+      min-height: 120px;
+      max-height: 300px;
+      overflow-y: auto;
+      color: #94A3B8;
+    }
+    .log-line { margin: 2px 0; }
+    .log-ok   { color: #34D399; }
+    .log-err  { color: #F87171; }
+    .log-info { color: #60A5FA; }
+    .log-warn { color: #FBBF24; }
+
+    /* Steps tracker */
+    .steps-tracker {
+      display: flex;
+      gap: 0;
+      margin-bottom: 24px;
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .step-item {
+      flex: 1;
+      padding: 10px 8px;
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      border-right: 1px solid var(--border);
+      transition: all 0.3s;
+    }
+    .step-item:last-child { border-right: none; }
+    .step-item.active  { background: rgba(99,102,241,0.2); color: #A5B4FC; }
+    .step-item.done    { background: rgba(16,185,129,0.15); color: #34D399; }
+    .step-item .s-icon { font-size: 1rem; display: block; margin-bottom: 2px; }
+
+    /* Grid */
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 500px) { .form-row { grid-template-columns: 1fr; } }
+
+    /* Helper text */
+    .helper { font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; }
+    code {
+      background: rgba(99,102,241,0.2);
+      color: #A5B4FC;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.85em;
+    }
+    .divider { height: 1px; background: var(--border); margin: 20px 0; }
+
+    /* Spinner */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .fa-spin { animation: spin 1s linear infinite; }
+
+    /* Result section */
+    #result-section { display: none; }
+    .success-box {
+      text-align: center;
+      padding: 32px 20px;
+    }
+    .success-box .check-icon {
+      font-size: 4rem;
+      color: var(--success);
+      margin-bottom: 16px;
+    }
+    .success-box h2 { font-size: 1.4rem; margin-bottom: 8px; }
+    .success-box p  { color: var(--text-muted); margin-bottom: 20px; }
+    .link-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #6366F1, #4F46E5);
+      color: #fff;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .link-btn:hover { transform: translateY(-2px); }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="setup-header">
+    <i class="fa-brands fa-google fire-icon"></i>
+    <h1><i class="fa-solid fa-fire-flame-curved"></i> Firebase Auto Setup</h1>
+    <p>ระบบทะเบียนคุมเบิกจ่ายร้านค้า — ตั้งค่า Firestore อัตโนมัติ</p>
+  </div>
+
+  <!-- Steps tracker -->
+  <div class="steps-tracker" id="steps-tracker">
+    <div class="step-item active" id="step1-track">
+      <span class="s-icon">⚙️</span> ใส่ Config
+    </div>
+    <div class="step-item" id="step2-track">
+      <span class="s-icon">👤</span> ข้อมูล Admin
+    </div>
+    <div class="step-item" id="step3-track">
+      <span class="s-icon">🔥</span> สร้าง Firestore
+    </div>
+    <div class="step-item" id="step4-track">
+      <span class="s-icon">✅</span> เสร็จสิ้น
+    </div>
+  </div>
+
+  <!-- STEP 1: Firebase Config -->
+  <div class="card" id="card-step1">
+    <div class="card-title">
+      <span class="step-badge" id="badge1">1</span>
+      วาง Firebase Config ของคุณ
+    </div>
+
+    <div class="alert alert-info">
+      <i class="fa-solid fa-circle-info"></i>
+      <div>
+        ไปที่ <strong>Firebase Console → Project Settings (⚙️) → Your apps → คลิก &lt;/&gt; Web → Register app</strong>
+        แล้วคัดลอก <code>firebaseConfig</code> ทั้งหมดมาวางด้านล่าง
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label><i class="fa-solid fa-code"></i> วาง firebaseConfig ที่นี่</label>
+      <textarea id="config-input" placeholder='วาง firebaseConfig ทั้ง block เช่น:
+
+const firebaseConfig = {
+  apiKey: "AIzaSy...",
+  authDomain: "your-project.firebaseapp.com",
+  projectId: "your-project-id",
+  storageBucket: "your-project.appspot.com",
+  messagingSenderId: "123456789",
+  appId: "1:123456789:web:abc123"
+};'></textarea>
+    </div>
+
+    <button class="btn btn-primary" id="btn-step1" onclick="validateConfig()">
+      <i class="fa-solid fa-arrow-right"></i> ถัดไป — ตรวจสอบ Config
+    </button>
+    <div id="step1-error" class="alert alert-danger" style="display:none; margin-top:12px;">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+      <span id="step1-error-msg"></span>
+    </div>
+  </div>
+
+  <!-- STEP 2: Admin Details -->
+  <div class="card" id="card-step2" style="display:none;">
+    <div class="card-title">
+      <span class="step-badge" id="badge2">2</span>
+      ข้อมูลผู้ดูแลระบบ (Admin)
+    </div>
+
+    <div class="alert alert-warning">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+      <div>
+        ต้องสร้าง User ใน <strong>Firebase Authentication → Users → Add user</strong> ก่อน
+        แล้วคัดลอก <strong>UID</strong> มาวางด้านล่าง
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label><i class="fa-solid fa-fingerprint"></i> User UID จาก Firebase Authentication <span style="color:var(--danger)">*</span></label>
+      <input type="text" id="admin-uid" placeholder="เช่น: abc123XYZdefGHIjklMNO456pqrSTU" autocomplete="off">
+      <p class="helper">คัดลอกจาก Firebase Console → Authentication → Users → คอลัมน์ User UID</p>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label><i class="fa-solid fa-envelope"></i> Email ของ Admin <span style="color:var(--danger)">*</span></label>
+        <input type="email" id="admin-email" placeholder="admin@thairat.local">
+      </div>
+      <div class="form-group">
+        <label><i class="fa-solid fa-id-badge"></i> ชื่อแสดง (Display Name) <span style="color:var(--danger)">*</span></label>
+        <input type="text" id="admin-displayname" placeholder="ผู้ดูแลระบบ (Admin)" value="ผู้ดูแลระบบ (Admin)">
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="card-title" style="margin-bottom:12px;">
+      <i class="fa-solid fa-database" style="color:var(--primary)"></i>
+      ตัวเลือกข้อมูลตัวอย่าง (Sample Data)
+    </div>
+    <div class="form-group">
+      <label>
+        <input type="checkbox" id="include-sample" checked style="width:auto; margin-right:6px;">
+        เพิ่มข้อมูลตัวอย่าง (ร้านค้า 3 ร้าน + รายการเบิกจ่าย 3 รายการ) เพื่อทดสอบระบบ
+      </label>
+    </div>
+
+    <div style="display:flex; gap:10px; margin-top:8px;">
+      <button class="btn btn-outline" onclick="goBack(1)">
+        <i class="fa-solid fa-arrow-left"></i> ย้อนกลับ
+      </button>
+      <button class="btn btn-primary" style="flex:1;" id="btn-step2" onclick="startSetup()">
+        <i class="fa-solid fa-fire-flame-curved"></i> เริ่มสร้าง Firestore!
+      </button>
+    </div>
+    <div id="step2-error" class="alert alert-danger" style="display:none; margin-top:12px;">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+      <span id="step2-error-msg"></span>
+    </div>
+  </div>
+
+  <!-- STEP 3: Running Setup -->
+  <div class="card" id="card-step3" style="display:none;">
+    <div class="card-title">
+      <span class="step-badge" id="badge3">3</span>
+      กำลังสร้าง Firestore...
+    </div>
+
+    <div class="log-box" id="log-output">
+      <div class="log-line log-info">🔥 เริ่มต้นการตั้งค่า Firebase...</div>
+    </div>
+
+    <div style="margin-top: 16px; text-align: center; color: var(--text-muted); font-size: 0.85rem;" id="setup-progress-text">
+      <i class="fa-solid fa-circle-notch fa-spin"></i> กำลังดำเนินการ...
+    </div>
+  </div>
+
+  <!-- STEP 4: Result -->
+  <div class="card" id="result-section">
+    <div class="success-box">
+      <div class="check-icon"><i class="fa-solid fa-circle-check"></i></div>
+      <h2>🎉 ตั้งค่า Firebase สำเร็จแล้ว!</h2>
+      <p>Firestore ถูกสร้างและเติมข้อมูลเรียบร้อย<br>ตอนนี้สามารถล็อกอินเข้าระบบได้เลยครับ</p>
+
+      <div class="alert alert-warning" style="text-align:left; margin-bottom:20px;">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <div>
+          <strong>ขั้นตอนสุดท้าย!</strong> ต้องเพิ่ม Domain ใน Firebase ก่อน:<br>
+          Firebase Console → <strong>Authentication → Settings → Authorized domains</strong><br>
+          → Add domain → ใส่ domain GitHub Pages ของคุณ เช่น <code>username.github.io</code>
+        </div>
+      </div>
+
+      <a href="index.html" class="link-btn">
+        <i class="fa-solid fa-right-to-bracket"></i> เปิดหน้าหลัก (ผู้บริหาร)
+      </a>
+      <a href="admin.html" class="link-btn" style="margin-left:10px; background:linear-gradient(135deg,#374151,#1F2937);">
+        <i class="fa-solid fa-screwdriver-wrench"></i> หน้าจัดการ (เจ้าหน้าที่)
+      </a>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ========================================================
+// Global state
+// ========================================================
+let parsedConfig = null;
+let firebaseApp  = null;
+let db           = null;
+
+// ========================================================
+// Logging
+// ========================================================
+function log(msg, type = 'info') {
+  const box   = document.getElementById('log-output');
+  const line  = document.createElement('div');
+  line.className = `log-line log-${type}`;
+  const icons = { ok:'✅', err:'❌', info:'ℹ️', warn:'⚠️' };
+  line.textContent = `${icons[type] || '→'} ${msg}`;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+}
+
+// ========================================================
+// STEP 1 — Validate config
+// ========================================================
+function validateConfig() {
+  const raw = document.getElementById('config-input').value.trim();
+  const errEl  = document.getElementById('step1-error');
+  const errMsg = document.getElementById('step1-error-msg');
+
+  const showErr = (msg) => {
+    errEl.style.display  = 'flex';
+    errMsg.textContent   = msg;
+  };
+
+  if (!raw) { showErr('กรุณาวาง firebaseConfig ก่อนครับ'); return; }
+
+  try {
+    // Extract object from string (handles "const firebaseConfig = {...}" or just "{...}")
+    let jsonStr = raw;
+
+    // Try to extract the object part
+    const objMatch = raw.match(/\{[\s\S]*\}/);
+    if (!objMatch) { showErr('ไม่พบรูปแบบ { ... } ใน firebaseConfig'); return; }
+    jsonStr = objMatch[0];
+
+    // Convert JS object syntax to JSON (fix unquoted keys)
+    jsonStr = jsonStr
+      .replace(/\/\/.*/g, '')           // remove comments
+      .replace(/,\s*\}/g, '}')          // remove trailing comma
+      .replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3')  // quote keys
+      .replace(/:\s*"([^"]*)"(\s*[,}])/g, ': "$1"$2') // ensure string values are quoted
+      .replace(/:\s*([^"{\[\d\s][^,\n}]*)/g, (_, v) => `: "${v.trim()}"`); // quote unquoted string values
+
+    parsedConfig = JSON.parse(jsonStr);
+
+    const required = ['apiKey','authDomain','projectId'];
+    for (const key of required) {
+      if (!parsedConfig[key] || parsedConfig[key].includes('PASTE_YOUR')) {
+        showErr(`ค่า "${key}" ยังไม่ได้กรอก กรุณาใส่ค่าจริงจาก Firebase Console`);
+        return;
+      }
+    }
+
+    errEl.style.display = 'none';
+
+    // Move to step 2
+    document.getElementById('card-step1').style.display = 'none';
+    document.getElementById('card-step2').style.display = 'block';
+    updateTracker(2);
+
+  } catch(e) {
+    // Fallback: try eval in sandbox
+    try {
+      const fn = new Function(raw + '; return firebaseConfig;');
+      parsedConfig = fn();
+      if (!parsedConfig || !parsedConfig.apiKey) throw new Error('invalid');
+
+      errEl.style.display = 'none';
+      document.getElementById('card-step1').style.display = 'none';
+      document.getElementById('card-step2').style.display = 'block';
+      updateTracker(2);
+    } catch(e2) {
+      showErr('รูปแบบ Config ไม่ถูกต้อง: ' + e.message + ' กรุณาคัดลอกใหม่จาก Firebase Console');
+    }
+  }
+}
+
+function goBack(step) {
+  if (step === 1) {
+    document.getElementById('card-step2').style.display = 'none';
+    document.getElementById('card-step1').style.display = 'block';
+    updateTracker(1);
+  }
+}
+
+function updateTracker(activeStep) {
+  for (let i = 1; i <= 4; i++) {
+    const el = document.getElementById(`step${i}-track`);
+    el.classList.remove('active','done');
+    if (i < activeStep)  el.classList.add('done');
+    if (i === activeStep) el.classList.add('active');
+  }
+}
+
+// ========================================================
+// STEP 2 → Start Setup
+// ========================================================
+async function startSetup() {
+  const uid         = document.getElementById('admin-uid').value.trim();
+  const email       = document.getElementById('admin-email').value.trim();
+  const displayName = document.getElementById('admin-displayname').value.trim();
+  const errEl       = document.getElementById('step2-error');
+  const errMsg      = document.getElementById('step2-error-msg');
+
+  const showErr = (msg) => { errEl.style.display='flex'; errMsg.textContent=msg; };
+  errEl.style.display = 'none';
+
+  if (!uid)         { showErr('กรุณาใส่ UID จาก Firebase Authentication ก่อนครับ'); return; }
+  if (!email)       { showErr('กรุณาใส่ Email ของ Admin'); return; }
+  if (!displayName) { showErr('กรุณาใส่ชื่อแสดงของ Admin'); return; }
+
+  // Show step 3
+  document.getElementById('card-step2').style.display = 'none';
+  document.getElementById('card-step3').style.display = 'block';
+  updateTracker(3);
+
+  const includeSample = document.getElementById('include-sample').checked;
+
+  await runFirestoreSetup(uid, email, displayName, includeSample);
+}
+
+// ========================================================
+// STEP 3 — Firestore Setup
+// ========================================================
+async function runFirestoreSetup(uid, email, displayName, includeSample) {
+  const progressText = document.getElementById('setup-progress-text');
+
+  try {
+    log('กำลังเชื่อมต่อ Firebase...', 'info');
+    await delay(500);
+
+    // Init Firebase
+    try {
+      firebaseApp = firebase.initializeApp(parsedConfig);
+    } catch(e) {
+      // Already initialized
+      firebaseApp = firebase.app();
+    }
+    db = firebase.firestore();
+
+    log('เชื่อมต่อ Firebase สำเร็จ ✓', 'ok');
+    await delay(400);
+
+    // ── Create users collection ──
+    log('กำลังสร้าง Collection "users"...', 'info');
+    progressText.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> สร้างข้อมูล Admin...';
+
+    await db.collection('users').doc(uid).set({
+      email:       email,
+      displayName: displayName,
+      role:        'admin',
+      disabled:    false,
+      createdAt:   firebase.firestore.FieldValue.serverTimestamp()
+    });
+    log(`สร้าง Admin User สำเร็จ: ${displayName} (${email})`, 'ok');
+    await delay(400);
+
+    if (includeSample) {
+      log('กำลังเพิ่มข้อมูลตัวอย่างร้านค้า...', 'info');
+      progressText.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> เพิ่มข้อมูลร้านค้าตัวอย่าง...';
+
+      const today   = new Date();
+      const fmt     = (d) => { const x = new Date(today); x.setDate(x.getDate()-d); return x.toISOString().substring(0,10); };
+
+      // ── Sample Shops ──
+      const shop1Ref = await db.collection('shops').add({
+        name:        'ร้านค้า มั่งมีก่อสร้าง จำกัด',
+        taxId:       '0105561023456',
+        bankName:    'ธนาคารกสิกรไทย',
+        bankAccount: '123-2-88899-0',
+        phone:       '02-555-1234',
+        email:       'sales@mangmeebuild.co.th',
+        address:     '99/1 ถ.รามอินทรา แขวงอนุสาวรีย์ เขตบางเขน กรุงเทพฯ 10220',
+        totalBudget: 150000
+      });
+      log('เพิ่มร้านค้า "มั่งมีก่อสร้าง" สำเร็จ', 'ok');
+
+      const shop2Ref = await db.collection('shops').add({
+        name:        'บริษัท ทวีผลเครื่องพิมพ์ จำกัด',
+        taxId:       '0105559876543',
+        bankName:    'ธนาคารไทยพาณิชย์',
+        bankAccount: '045-3-01928-1',
+        phone:       '081-888-2930',
+        email:       'taweephol.print@gmail.com',
+        address:     '22 ซอยลาดพร้าว 15 แขวงจอมพล เขตจตุจักร กรุงเทพฯ 10900',
+        totalBudget: 40000
+      });
+      log('เพิ่มร้านค้า "ทวีผลเครื่องพิมพ์" สำเร็จ', 'ok');
+
+      const shop3Ref = await db.collection('shops').add({
+        name:        'สำนักงาน เจริญกิจบริการ (คุณพรเทพ)',
+        taxId:       '3101402345678',
+        bankName:    'ธนาคารกรุงเทพ',
+        bankAccount: '240-0-12345-6',
+        phone:       '090-123-4567',
+        email:       'pornthep.c@outlook.com',
+        address:     '8 ซอยสุขุมวิท 49 แขวงคลองตันเหนือ เขตวัฒนา กรุงเทพฯ 10110',
+        totalBudget: 20000
+      });
+      log('เพิ่มร้านค้า "เจริญกิจบริการ" สำเร็จ', 'ok');
+      await delay(300);
+
+      // ── Sample Disbursements ──
+      log('กำลังเพิ่มรายการเบิกจ่ายตัวอย่าง...', 'info');
+      progressText.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> เพิ่มรายการเบิกจ่ายตัวอย่าง...';
+
+      await db.collection('disbursements').add({
+        date: fmt(2), ref: 'PV-6906001', shopId: shop1Ref.id,
+        details:       'จัดซื้อสีทาภายนอก และแปรงทาสี โครงการปรับปรุงสำนักงาน',
+        subtotal:      15500, vatType: 'exclude', vatAmount: 1085,
+        whtRate:       0, whtAmount: 0, netAmount: 16585,
+        paymentMethod: 'โอนเงินผ่านธนาคาร', status: 'Paid'
+      });
+      log('เพิ่มรายการ PV-6906001 สำเร็จ', 'ok');
+
+      await db.collection('disbursements').add({
+        date: fmt(5), ref: 'PV-6906002', shopId: shop2Ref.id,
+        details:       'พิมพ์โบชัวร์แนะนำผลิตภัณฑ์ใหม่ ขนาด A4 จำนวน 2,000 แผ่น',
+        subtotal:      8000, vatType: 'include', vatAmount: 523.36,
+        whtRate:       3, whtAmount: 224.3, netAmount: 7775.7,
+        paymentMethod: 'โอนเงินผ่านธนาคาร', status: 'Paid'
+      });
+      log('เพิ่มรายการ PV-6906002 สำเร็จ', 'ok');
+
+      await db.collection('disbursements').add({
+        date: fmt(10), ref: 'PV-6906003', shopId: shop3Ref.id,
+        details:       'ว่าจ้างล้างเครื่องปรับอากาศชั้น 1-3 สำนักงานใหญ่',
+        subtotal:      4500, vatType: 'none', vatAmount: 0,
+        whtRate:       3, whtAmount: 135, netAmount: 4365,
+        paymentMethod: 'เงินสด', status: 'Pending'
+      });
+      log('เพิ่มรายการ PV-6906003 สำเร็จ', 'ok');
+      await delay(300);
+    }
+
+    // ── Update firebase-config.js reminder ──
+    log('─────────────────────────────────────', 'info');
+    log('ตั้งค่า Firestore เสร็จสมบูรณ์ทุกอย่าง!', 'ok');
+    log('กรุณาอัปเดตไฟล์ firebase-config.js ด้วย config นี้', 'warn');
+    log(`projectId: ${parsedConfig.projectId}`, 'info');
+
+    progressText.innerHTML = '<i class="fa-solid fa-circle-check" style="color:var(--success)"></i> <span style="color:var(--success)">เสร็จสมบูรณ์!</span>';
+
+    await delay(1000);
+
+    // Show result
+    document.getElementById('card-step3').style.display   = 'none';
+    document.getElementById('result-section').style.display = 'block';
+    updateTracker(4);
+
+    // Update firebase-config.js auto if possible
+    autoFillConfig();
+
+  } catch(e) {
+    log('เกิดข้อผิดพลาด: ' + e.message, 'err');
+    progressText.innerHTML = `<span style="color:var(--danger)"><i class="fa-solid fa-circle-xmark"></i> เกิดข้อผิดพลาด</span>`;
+
+    if (e.message.includes('permission') || e.code === 'permission-denied') {
+      log('→ Firestore อาจยังไม่ได้เปิดใช้งาน หรือ Security Rules ไม่อนุญาต', 'warn');
+      log('→ ตรวจสอบว่าเลือก "test mode" ตอนสร้าง Firestore', 'warn');
+    }
+    if (e.message.includes('network') || e.message.includes('offline')) {
+      log('→ ตรวจสอบการเชื่อมต่ออินเตอร์เน็ต', 'warn');
+    }
+  }
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ── Auto-generate updated firebase-config.js content ──
+function autoFillConfig() {
+  if (!parsedConfig) return;
+
+  const configContent = `// firebase-config.js
+// ตั้งค่าโดย Firebase Auto Setup — ${new Date().toLocaleDateString('th-TH')}
+const firebaseConfig = {
+  apiKey:            "${parsedConfig.apiKey || ''}",
+  authDomain:        "${parsedConfig.authDomain || ''}",
+  projectId:         "${parsedConfig.projectId || ''}",
+  storageBucket:     "${parsedConfig.storageBucket || ''}",
+  messagingSenderId: "${parsedConfig.messagingSenderId || ''}",
+  appId:             "${parsedConfig.appId || ''}"
+};`;
+
+  // Download the file automatically
+  const blob = new Blob([configContent], { type: 'text/javascript' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'firebase-config.js';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>
